@@ -44,7 +44,12 @@ export default defineConfig({
         ],
       },
       workbox: {
-        navigateFallback: 'index.html',
+        // HashRouter does not need navigateFallback; keeping a stale
+        // precached index.html after deploy is a common blank-page cause.
+        navigateFallback: null,
+        cleanupOutdatedCaches: true,
+        clientsClaim: true,
+        skipWaiting: true,
         globPatterns: ['**/*.{js,css,html,svg,png,ico,woff2}'],
       },
     }),
