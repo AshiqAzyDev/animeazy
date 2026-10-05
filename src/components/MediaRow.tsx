@@ -76,23 +76,43 @@ export function MediaRow({
           )}
         </div>
         <style>{`
-          .row { margin-top: 28px; }
+          .row { margin-top: 32px; }
           .section-title .left { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
           .section-title .title-main {
             position: relative; display: inline-block; padding-bottom: 7px;
           }
           .section-title .draw {
-            position: absolute; left: 0; bottom: 0; height: 2px; width: 100%;
-            border-radius: 99px; transform-origin: left;
+            position: absolute; left: 0; bottom: 0; height: 2px; width: 42%;
+            max-width: 72px; border-radius: 99px; transform-origin: left;
             background: linear-gradient(90deg, var(--pink), transparent);
             display: block;
           }
           .track {
-            display: flex; gap: 14px; overflow-x: auto; scroll-snap-type: x proximity;
-            padding: 10px clamp(16px, 3vw, 36px) 8px; scrollbar-width: none;
+            display: flex;
+            gap: 18px;
+            overflow-x: auto;
+            scroll-snap-type: x mandatory;
+            scroll-padding-inline: clamp(16px, 3vw, 36px);
+            padding: 6px clamp(16px, 3vw, 36px) 8px;
+            scrollbar-width: none;
+            -webkit-overflow-scrolling: touch;
           }
-          .top .track { gap: 22px; }
+          .top .track {
+            gap: 18px;
+            padding-top: 8px;
+            padding-bottom: 4px;
+          }
           .track::-webkit-scrollbar { display: none; }
+
+          @media (max-width: 700px) {
+            .row { margin-top: 22px; }
+            .track {
+              gap: 12px;
+              scroll-padding-inline: 14px;
+              padding: 4px 14px 6px;
+            }
+            .top .track { gap: 12px; }
+          }
         `}</style>
       </section>
     </SectionReveal>
