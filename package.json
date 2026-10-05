@@ -5,10 +5,15 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:server": "npm --prefix server run dev",
+    "dev:all": "npm run dev:server & npm run dev",
     "build": "tsc --noEmit && vite build",
+    "lint": "tsc --noEmit",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:server": "npm --prefix server test",
+    "build:server": "npm --prefix server run build"
   },
   "dependencies": {
     "@auth0/auth0-react": "^2.28.2",

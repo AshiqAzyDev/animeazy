@@ -162,15 +162,24 @@ export function Nav({ onSearch }: Props) {
         }
         @media (max-width: 1100px) {
           .hide-sm { display: none !important; }
+          .links { display: none; }
+          .topbar {
+            grid-template-columns: minmax(0, 1fr) auto;
+            gap: 10px;
+          }
         }
         @media (max-width: 900px) {
           .topbar {
-            grid-template-columns: 1fr auto;
-            gap: 10px;
+            height: auto;
+            min-height: var(--header-h);
+            padding-top: calc(8px + var(--safe-t));
+            padding-bottom: 8px;
           }
-          .links { display: none; }
-          .search-pill span, .search-pill kbd, .profile-meta { display: none; }
+          .search-pill { padding: 10px 14px; }
+          .search-pill span { display: block; font-size: .85rem; }
+          .search-pill kbd, .profile-meta { display: none; }
           .profile { padding: 0; background: none; border: 0; }
+          .signin { padding: 10px 12px; font-size: .85rem; }
         }
       `}</style>
     </header>

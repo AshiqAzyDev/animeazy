@@ -1,42 +1,72 @@
 import { getStreamingApiBase, hasRemoteStreamingApi } from '../config/streaming';
-import {
-  getEpisodeServersForCatalog,
-  getProviderEpisodes,
-  resolveEpisodeSources,
-  type ResolveSourcesOptions,
-} from '../streaming/service';
-import { listProviderSummaries } from '../streaming/registry';
 import type { ProviderEpisode, ProviderServer, StreamingResult } from '../streaming/types';
 import { StreamingError } from '../streaming/types';
 
-/**
- * Frontend streaming API contract.
- *
- * When `VITE_STREAMING_API_BASE` is set, calls a future authorized backend:
- *   GET /api/streaming/providers
- *   GET /api/streaming/anime/:animeId/episodes?provider=
- *   GET /api/streaming/anime/:animeId/episode/:episodeNumber/servers?provider=
- *   GET /api/streaming/anime/:animeId/episode/:episodeNumber/sources?provider=&server=
- *
- * GitHub Pages cannot host that API. Without a base URL, resolution uses the
- * local provider registry (mock/demo only) — never pirate scrapers.
- */
+export type ProviderSummary = {
+  id: string;
+  name: string;
+  developmentOnly?: boolean;
+  enabled?: boolean;
+};
+
+export type ResolveSourcesOptions = {
+  providerId?: string;
+  serverId?: string;
+  allowFallback?: boolean;
+};
+
+function requireApiBase(): string {
+  const base = getStreamingApiBase();
+  if (!base) {
+    throw new StreamingError(
+      'network',
+      'Streaming API not configured. Set VITE_STREAMING_API_BASE and start the server.',
+    );
+  }
+  return base;
+}
+
+function mapCode(code?: string): StreamingError['code'] {
+  switch (code) {
+    case 'PROVIDER_NOT_FOUND':
+      return 'invalid_provider';
+    case 'PROVIDER_DISABLED':
+      return 'provider_unavailable';
+    case 'EPISODE_NOT_FOUND':
+      return 'episode_unavailable';
+    case 'SERVER_NOT_FOUND':
+      return 'server_unavailable';
+    case 'SOURCE_NOT_FOUND':
+      return 'source_resolution_failed';
+    case 'PROVIDER_TIMEOUT':
+      return 'timeout';
+    case 'UNSUPPORTED_SOURCE':
+      return 'unsupported_format';
+    default:
+      return 'network';
+  }
+}
 
 async function remoteFetch<T>(path: string): Promise<T> {
-  const base = getStreamingApiBase();
+  const base = requireApiBase();
   const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), 12_000);
+  const timer = setTimeout(() => ctrl.abort(), 15_000);
   try {
     const res = await fetch(`${base}${path}`, {
       signal: ctrl.signal,
       headers: { Accept: 'application/json' },
     });
     if (!res.ok) {
-      const text = await res.text().catch(() => '');
-      throw new StreamingError(
-        res.status === 404 ? 'episode_unavailable' : 'network',
-        text || `Streaming API ${res.status}`,
-      );
+      let code: string | undefined;
+      let message = `Streaming API ${res.status}`;
+      try {
+        const body = (await res.json()) as { code?: string; message?: string };
+        code = body.code;
+        if (body.message) message = body.message;
+      } catch {
+        /* ignore */
+      }
+      throw new StreamingError(mapCode(code), message);
     }
     return (await res.json()) as T;
   } catch (err) {
@@ -53,25 +83,23 @@ async function remoteFetch<T>(path: string): Promise<T> {
   }
 }
 
+/**
+ * Frontend streaming API client.
+ * Requires VITE_STREAMING_API_BASE — provider resolution runs on the server only.
+ */
 export const streamingClient = {
+  configured: hasRemoteStreamingApi,
+
   listProviders() {
-    if (hasRemoteStreamingApi()) {
-      return remoteFetch<{ id: string; name: string; developmentOnly?: boolean }[]>(
-        '/api/streaming/providers',
-      );
-    }
-    return Promise.resolve(listProviderSummaries());
+    return remoteFetch<ProviderSummary[]>('/api/streaming/providers');
   },
 
   getEpisodes(catalogAnimeId: string, providerId: string, title?: string) {
-    if (hasRemoteStreamingApi()) {
-      const qs = new URLSearchParams({ provider: providerId });
-      if (title) qs.set('title', title);
-      return remoteFetch<ProviderEpisode[]>(
-        `/api/streaming/anime/${encodeURIComponent(catalogAnimeId)}/episodes?${qs}`,
-      );
-    }
-    return getProviderEpisodes(providerId, catalogAnimeId, title);
+    const qs = new URLSearchParams({ provider: providerId });
+    if (title) qs.set('title', title);
+    return remoteFetch<ProviderEpisode[]>(
+      `/api/streaming/anime/${encodeURIComponent(catalogAnimeId)}/episodes?${qs}`,
+    );
   },
 
   getServers(
@@ -80,14 +108,11 @@ export const streamingClient = {
     providerId: string,
     title?: string,
   ) {
-    if (hasRemoteStreamingApi()) {
-      const qs = new URLSearchParams({ provider: providerId });
-      if (title) qs.set('title', title);
-      return remoteFetch<ProviderServer[]>(
-        `/api/streaming/anime/${encodeURIComponent(catalogAnimeId)}/episode/${episodeNumber}/servers?${qs}`,
-      );
-    }
-    return getEpisodeServersForCatalog(providerId, catalogAnimeId, episodeNumber, title);
+    const qs = new URLSearchParams({ provider: providerId });
+    if (title) qs.set('title', title);
+    return remoteFetch<ProviderServer[]>(
+      `/api/streaming/anime/${encodeURIComponent(catalogAnimeId)}/episode/${episodeNumber}/servers?${qs}`,
+    );
   },
 
   getSources(
@@ -96,15 +121,13 @@ export const streamingClient = {
     title: string | undefined,
     options: ResolveSourcesOptions = {},
   ) {
-    if (hasRemoteStreamingApi()) {
-      const qs = new URLSearchParams();
-      if (options.providerId) qs.set('provider', options.providerId);
-      if (options.serverId) qs.set('server', options.serverId);
-      if (title) qs.set('title', title);
-      return remoteFetch<StreamingResult>(
-        `/api/streaming/anime/${encodeURIComponent(catalogAnimeId)}/episode/${episodeNumber}/sources?${qs}`,
-      );
-    }
-    return resolveEpisodeSources(catalogAnimeId, episodeNumber, title, options);
+    const qs = new URLSearchParams();
+    if (options.providerId) qs.set('provider', options.providerId);
+    if (options.serverId) qs.set('server', options.serverId);
+    if (title) qs.set('title', title);
+    if (options.allowFallback) qs.set('fallback', 'true');
+    return remoteFetch<StreamingResult>(
+      `/api/streaming/anime/${encodeURIComponent(catalogAnimeId)}/episode/${episodeNumber}/sources?${qs}`,
+    );
   },
 };

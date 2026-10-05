@@ -307,12 +307,36 @@ img {
   }
 }
 
-@media (max-width: 900px) {
+@media (max-width: 1100px) {
   .hide-mobile {
     display: none !important;
   }
 
   .app-main {
     margin-left: 0;
+  }
+}
+
+@media (max-width: 900px) {
+  .page {
+    padding-bottom: calc(120px + var(--safe-b));
+  }
+
+  .container {
+    padding-inline: 14px;
+  }
+
+  .section-title {
+    padding-inline: 0;
+    flex-wrap: wrap;
+  }
+
+  .btn {
+    padding: 12px 18px;
+  }
+
+  .chip {
+    padding: 9px 14px;
+    font-size: 0.82rem;
   }
 }

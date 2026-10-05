@@ -5,11 +5,14 @@ import {
   searchSubtitles,
   setOpenSubtitlesKey,
 } from '../api/opensubtitles';
+import { subtitleClient } from '../api/subtitleClient';
+import { isStreamConfigured } from '../config/streaming';
 import type { SubtitleItem } from '../types/media';
 import { MagneticButton } from '../motion/MagneticButton';
 import { useToast } from '../context/ToastContext';
 
 export function SubtitlesPage() {
+  const useBackend = isStreamConfigured();
   const projectKey = hasProjectOpenSubtitlesKey();
   const [key, setKey] = useState(getOpenSubtitlesKey());
   const [q, setQ] = useState('');
@@ -27,7 +30,21 @@ export function SubtitlesPage() {
     setLoading(true);
     setError('');
     try {
-      setItems(await searchSubtitles(q));
+      if (useBackend) {
+        const tracks = await subtitleClient.search({ query: q, languages: 'en' });
+        setItems(
+          tracks.map((t, i) => ({
+            id: `${t.language}-${i}`,
+            release: t.label || t.language,
+            language: t.language,
+            downloads: 0,
+            hearingImpaired: t.kind === 'captions',
+            url: t.url,
+          })),
+        );
+      } else {
+        setItems(await searchSubtitles(q));
+      }
     } catch (e) {
       setError((e as Error).message);
       setItems([]);
@@ -41,12 +58,16 @@ export function SubtitlesPage() {
       <h1>Subtitles</h1>
       <p className="sub">
         Powered by OpenSubtitles.
-        {projectKey
-          ? ' Project API key is loaded from `.env`.'
-          : ' Add `VITE_OPENSUBTITLES_API_KEY` to `.env`, or paste a key below.'}
+        {useBackend
+          ? ' Searching through the ANIMEAZY API (server-side key).'
+          : projectKey
+            ? ' Project API key is loaded from `.env` (prefer server OPENSUBTITLES_API_KEY).'
+            : ' Start the streaming API or add a browser key below.'}
       </p>
 
-      {projectKey ? (
+      {useBackend ? (
+        <p className="ok">✓ Using streaming API for subtitle search</p>
+      ) : projectKey ? (
         <p className="ok">✓ Using project key from environment</p>
       ) : (
         <div className="panel">
@@ -80,7 +101,8 @@ export function SubtitlesPage() {
             <div>
               <strong>{item.release}</strong>
               <span>
-                {item.language.toUpperCase()} · {item.downloads} downloads
+                {item.language.toUpperCase()}
+                {item.downloads ? ` · ${item.downloads} downloads` : ''}
                 {item.hearingImpaired ? ' · HI' : ''}
               </span>
             </div>

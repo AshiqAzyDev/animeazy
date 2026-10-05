@@ -8,12 +8,13 @@ type Props = {
   servers: ServerOption[];
   value: string;
   onChange: (id: string) => void;
+  label?: string;
 };
 
-export function ServerSelector({ servers, value, onChange }: Props) {
+export function ServerSelector({ servers, value, onChange, label = 'Server' }: Props) {
   return (
     <div className="ctrl-group">
-      <span className="label">Server</span>
+      <span className="label">{label}</span>
       <div className="pills">
         {servers.map((s) => (
           <button

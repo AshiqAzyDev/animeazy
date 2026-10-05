@@ -48,6 +48,11 @@ function mapAnime(a: KitsuAnime): MediaCard {
     : undefined;
   const poster = bestImg(a.attributes.posterImage);
   const cover = bestImg(a.attributes.coverImage, true);
+  const synopsis = (a.attributes.synopsis || '')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/\s+\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
   return {
     id: `kitsu-${a.id}`,
     kind: 'anime',
@@ -59,7 +64,7 @@ function mapAnime(a: KitsuAnime): MediaCard {
     year: a.attributes.startDate ? Number(a.attributes.startDate.slice(0, 4)) : undefined,
     type: a.attributes.subtype,
     status: a.attributes.status,
-    synopsis: a.attributes.synopsis,
+    synopsis,
     episodes: a.attributes.episodeCount ?? undefined,
     hue: hashHue(title),
     trailerYoutubeId: a.attributes.youtubeVideoId || undefined,

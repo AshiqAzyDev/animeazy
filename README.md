@@ -2,35 +2,50 @@
 
 Premium anime & manga **discovery** hub for GitHub Pages.
 
-Explore. Track. Read. — trailers, schedules, MangaDex reading, quotes, trace.moe, and OpenSubtitles (your API key). **No unauthorized episode streaming.**
+Explore. Track. Read. — trailers, schedules, MangaDex reading, quotes, trace.moe, and OpenSubtitles. **No unauthorized episode streaming.**
 
 ## Stack
 
-- Vite + React + TypeScript
-- Framer Motion, GSAP-ready motion helpers, Lenis
-- TanStack Query
-- Auth0 (optional)
-- Jikan, Kitsu, Shikimori, MangaDex, Animechan, trace.moe, OpenSubtitles
-- Authorized streaming provider architecture (`src/streaming/`) + HTML5/`hls.js` player
+- Vite + React + TypeScript (frontend)
+- Node + Hono + TypeScript (`server/`) for streaming/data API
+- Framer Motion, GSAP helpers, Lenis, TanStack Query, Auth0 (optional)
+- Jikan, Kitsu, Shikimori, MangaDex, Animechan, trace.moe
+- HTML5 / `hls.js` player via authorized/mock providers
+
+See [docs/STREAMING.md](docs/STREAMING.md) for the full streaming architecture.
 
 ## Develop
 
 ```bash
+# API (terminal 1)
+cd server
+cp .env.example .env
+npm install
+npm run dev
+
+# Frontend (terminal 2)
+cd ..
+cp .env.example .env
+# set VITE_STREAMING_API_BASE=http://localhost:3000
 npm install
 npm run dev
 ```
 
-Copy `.env.example` to `.env` and fill Auth0 values if you want login.
+- Frontend: http://localhost:5173  
+- API: http://localhost:3000/health  
 
-Streaming (authorized only):
+## Scripts
 
-- `VITE_STREAM_MOCK_ENABLED=true` — demo provider with public sample HLS/MP4 (local testing)
-- `VITE_STREAMING_API_BASE=` — optional future authorized backend base URL
-- `npm test` — unit tests for providers/quality/normalization
-
-GitHub Pages cannot host the streaming API. Point `VITE_STREAMING_API_BASE` at your own authorized backend when ready.
+| Command | Description |
+|---------|-------------|
+| `npm run dev` | Vite frontend |
+| `npm run dev:server` | Streaming API |
+| `npm run build` / `npm run lint` / `npm test` | Frontend |
+| `npm run build:server` / `npm run test:server` | Backend |
 
 ## Build / deploy
+
+**Frontend (GitHub Pages)**
 
 ```bash
 npm run build
@@ -38,22 +53,11 @@ npm run build
 
 Site: **https://ashiqazydev.github.io/animeazy/**
 
-GitHub Actions (`.github/workflows/deploy.yml`) builds and publishes `dist` to Pages. Source must be **GitHub Actions**.
+Set Actions secret `VITE_STREAMING_API_BASE` to your deployed API URL.
 
-Optional secrets (Settings → Secrets and variables → Actions):
+**Backend**
 
-| Secret | Notes |
-|--------|--------|
-| `VITE_AUTH0_DOMAIN` | Auth0 tenant |
-| `VITE_AUTH0_CLIENT_ID` | Auth0 SPA client |
-| `VITE_AUTH0_AUDIENCE` | Optional |
-| `VITE_AUTH0_CALLBACK_URL` | Defaults to `https://ashiqazydev.github.io/animeazy/` |
-| `VITE_OPENSUBTITLES_API_KEY` | Subtitles page |
-| `VITE_STREAMING_API_BASE` | Authorized backend (leave empty for demo) |
-| `VITE_STREAM_MOCK_ENABLED` | Defaults to `true` on Pages |
-| `VITE_STREAM_AUTO_FALLBACK` | Defaults to `false` |
-
-In Auth0, add Allowed Callback / Logout URLs: `https://ashiqazydev.github.io/animeazy/`
+Deploy the `server/` package separately (Railway, Render, Fly, etc.). Configure `CORS_ORIGINS` to include your Pages origin. See [server/README.md](server/README.md).
 
 ## MangaDex
 

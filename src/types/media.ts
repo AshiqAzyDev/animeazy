@@ -50,6 +50,10 @@ export interface MangaChapter {
   pages?: number;
   groupName?: string;
   translatedLanguage?: string;
+  /** Official/external host (e.g. MangaPlus) — not readable via MangaDex at-home */
+  externalUrl?: string;
+  /** True when MangaDex hosts image pages for this chapter */
+  readable?: boolean;
 }
 
 export interface QuoteItem {

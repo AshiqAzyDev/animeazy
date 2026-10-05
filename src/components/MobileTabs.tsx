@@ -32,7 +32,7 @@ export function MobileTabs() {
       </NavLink>
       <style>{`
         .tabs { display: none; }
-        @media (max-width: 900px) {
+        @media (max-width: 1100px) {
           .tabs {
             display: flex; position: fixed; z-index: 40;
             left: 12px; right: 12px; bottom: calc(12px + var(--safe-b));

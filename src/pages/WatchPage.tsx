@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useEffect, useMemo, useState } from 'react';
 import { animeCatalog } from '../api/animeCatalog';
 import { streamingClient } from '../api/streamingClient';
-import { getWatchServerOptions, isStreamConfigured } from '../config/streaming';
+import { isStreamConfigured } from '../config/streaming';
 import { QualitySelector } from '../components/video/QualitySelector';
 import { ServerSelector } from '../components/video/ServerSelector';
 import { SubtitleSelector } from '../components/video/SubtitleSelector';
@@ -25,14 +25,14 @@ export function WatchPage() {
   const { toggle, has } = useMyList();
 
   const ep = Math.max(1, Number(params.get('ep') || 1) || 1);
-  const servers = useMemo(() => getWatchServerOptions(), []);
-  const [serverId, setServerId] = useState(() =>
-    servers.some((s) => s.mode === 'provider') ? servers.find((s) => s.mode === 'provider')!.id : 'trailer',
-  );
+  const [providerId, setProviderId] = useState('trailer');
+  const [episodeServerId, setEpisodeServerId] = useState<string | undefined>();
   const [quality, setQuality] = useState('Auto');
   const [subtitleLanguage, setSubtitleLanguage] = useState('');
   const [subtitleTracks, setSubtitleTracks] = useState<SubtitleTrack[]>([]);
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(
+    () => typeof window === 'undefined' || window.matchMedia('(min-width: 961px)').matches,
+  );
   const [streamError, setStreamError] = useState<string | null>(null);
 
   const { data, isLoading, error } = useQuery({
@@ -42,21 +42,65 @@ export function WatchPage() {
     retry: 1,
   });
 
+  const providersQuery = useQuery({
+    queryKey: ['stream-providers'],
+    queryFn: () => streamingClient.listProviders(),
+    enabled: isStreamConfigured(),
+    staleTime: 60_000,
+    retry: 1,
+  });
+
+  const serverOptions = useMemo(() => {
+    const providers = (providersQuery.data ?? []).map((p) => ({
+      id: p.id,
+      label: p.name,
+      mode: 'provider' as const,
+      developmentOnly: p.developmentOnly,
+    }));
+    return [{ id: 'trailer', label: 'Trailer', mode: 'trailer' as const }, ...providers];
+  }, [providersQuery.data]);
+
+  useEffect(() => {
+    if (providerId !== 'trailer') return;
+    const first = serverOptions.find((s) => s.mode === 'provider');
+    if (first && isStreamConfigured()) setProviderId(first.id);
+  }, [serverOptions, providerId]);
+
   const episodeCount = useMemo(() => {
     const n = data?.episodes && data.episodes > 0 ? data.episodes : 12;
     return Math.min(Math.max(n, 1), 48);
   }, [data?.episodes]);
 
-  const server = servers.find((s) => s.id === serverId) || servers[0];
-  const isTrailer = server?.mode === 'trailer';
+  const selected = serverOptions.find((s) => s.id === providerId) || serverOptions[0];
+  const isTrailer = selected?.mode === 'trailer';
   const canPlayTrailer = Boolean(data?.trailerYoutubeId) && isTrailer;
 
+  const serversQuery = useQuery({
+    queryKey: ['stream-servers', id, ep, providerId, data?.title],
+    queryFn: () => streamingClient.getServers(id, ep, providerId, data?.title),
+    enabled: Boolean(data && !isTrailer && providerId && isStreamConfigured()),
+    staleTime: 30_000,
+    retry: 0,
+  });
+
+  useEffect(() => {
+    const servers = serversQuery.data;
+    if (!servers?.length) {
+      setEpisodeServerId(undefined);
+      return;
+    }
+    setEpisodeServerId((prev) =>
+      prev && servers.some((s) => s.id === prev) ? prev : servers[0].id,
+    );
+  }, [serversQuery.data]);
+
   const streamQuery = useQuery({
-    queryKey: ['stream-sources', id, ep, serverId, data?.title],
+    queryKey: ['stream-sources', id, ep, providerId, episodeServerId, data?.title],
     queryFn: async (): Promise<StreamingResult> => {
       try {
         return await streamingClient.getSources(id, ep, data?.title, {
-          providerId: serverId,
+          providerId,
+          serverId: episodeServerId,
           allowFallback: false,
         });
       } catch (err) {
@@ -67,7 +111,9 @@ export function WatchPage() {
         );
       }
     },
-    enabled: Boolean(data && !isTrailer && server?.mode === 'provider'),
+    enabled: Boolean(
+      data && !isTrailer && providerId && isStreamConfigured() && !serversQuery.isFetching,
+    ),
     retry: 0,
     staleTime: 15_000,
   });
@@ -131,8 +177,9 @@ export function WatchPage() {
     );
   }
 
-  const showProviderPlayer = !isTrailer && server?.mode === 'provider';
-  const streamLoading = showProviderPlayer && streamQuery.isFetching;
+  const showProviderPlayer = !isTrailer && selected?.mode === 'provider';
+  const streamLoading =
+    showProviderPlayer && (streamQuery.isFetching || serversQuery.isFetching);
   const streamReady = showProviderPlayer && Boolean(streamQuery.data) && !streamQuery.isError;
 
   return (
@@ -193,22 +240,26 @@ export function WatchPage() {
                   <h2>
                     {isTrailer
                       ? 'No trailer available'
-                      : streamLoading
-                        ? 'Resolving stream…'
-                        : streamError
-                          ? 'Stream unavailable'
-                          : 'No provider connected'}
+                      : !isStreamConfigured()
+                        ? 'Streaming API not configured'
+                        : streamLoading
+                          ? 'Resolving stream…'
+                          : streamError
+                            ? 'Stream unavailable'
+                            : 'No provider connected'}
                   </h2>
                   <p>
-                    Episode {ep} · {server?.label || 'Server'} · {quality}.
-                    {isTrailer
-                      ? ' Switch to a provider server when available, or open legal links below.'
-                      : streamError
-                        ? ` ${streamError}`
-                        : ' Enable the demo mock provider or connect an authorized streaming API.'}
+                    Episode {ep} · {selected?.label || 'Server'} · {quality}.
+                    {!isStreamConfigured()
+                      ? ' Set VITE_STREAMING_API_BASE and start the ANIMEAZY server.'
+                      : isTrailer
+                        ? ' Switch to a provider when available, or open legal links below.'
+                        : streamError
+                          ? ` ${streamError}`
+                          : ' Select a provider to load sources from the streaming API.'}
                   </p>
                   {data.trailerYoutubeId && !isTrailer && (
-                    <MagneticButton className="btn primary" onClick={() => setServerId('trailer')}>
+                    <MagneticButton className="btn primary" onClick={() => setProviderId('trailer')}>
                       Play trailer instead
                     </MagneticButton>
                   )}
@@ -224,14 +275,23 @@ export function WatchPage() {
 
           <div className="player-controls">
             <ServerSelector
-              servers={servers.map((s) => ({
+              label="Provider"
+              servers={serverOptions.map((s) => ({
                 id: s.id,
                 label: s.label,
-                developmentOnly: s.developmentOnly,
+                developmentOnly: 'developmentOnly' in s ? s.developmentOnly : undefined,
               }))}
-              value={serverId}
-              onChange={setServerId}
+              value={providerId}
+              onChange={setProviderId}
             />
+            {!!serversQuery.data?.length && showProviderPlayer && (
+              <ServerSelector
+                label="Server"
+                servers={serversQuery.data.map((s) => ({ id: s.id, label: s.name }))}
+                value={episodeServerId || serversQuery.data[0].id}
+                onChange={setEpisodeServerId}
+              />
+            )}
             <QualitySelector
               qualities={qualities}
               value={quality}
@@ -299,8 +359,8 @@ export function WatchPage() {
             </div>
             <p className="hint">
               {isStreamConfigured()
-                ? 'Provider architecture active. Trailer uses YouTube; demo streams use public sample media only.'
-                : 'No providers enabled. Set VITE_STREAM_MOCK_ENABLED=true for the demo player, or VITE_STREAMING_API_BASE for an authorized backend.'}
+                ? 'Streams resolve through the ANIMEAZY API. Trailer uses YouTube when available.'
+                : 'Set VITE_STREAMING_API_BASE=http://localhost:3000 and run the server for demo playback.'}
             </p>
           </aside>
         )}

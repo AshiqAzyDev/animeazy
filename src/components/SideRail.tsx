@@ -126,8 +126,8 @@ export function SideRail() {
           box-shadow: 0 10px 24px -12px var(--pink);
         }
         .rail-foot { display: grid; gap: 8px; }
-        @media (max-width: 900px) {
-          .side-rail { display: none; }
+        @media (max-width: 1100px) {
+          .side-rail { display: none !important; }
         }
       `}</style>
     </aside>

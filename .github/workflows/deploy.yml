@@ -34,8 +34,6 @@ jobs:
           VITE_STREAMING_API_BASE: ${{ secrets.VITE_STREAMING_API_BASE }}
           # Public Pages defaults (override via secrets if you fork/rename the repo)
           VITE_AUTH0_CALLBACK_URL: ${{ secrets.VITE_AUTH0_CALLBACK_URL || 'https://ashiqazydev.github.io/animeazy/' }}
-          VITE_STREAM_MOCK_ENABLED: ${{ secrets.VITE_STREAM_MOCK_ENABLED || 'true' }}
-          VITE_STREAM_AUTO_FALLBACK: ${{ secrets.VITE_STREAM_AUTO_FALLBACK || 'false' }}
         run: npm run build
       - uses: actions/upload-pages-artifact@v3
         with:

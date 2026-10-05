@@ -61,6 +61,11 @@ export function MangaPage() {
           display:grid; grid-template-columns: repeat(auto-fill, minmax(150px,1fr)); gap:18px;
         }
         .grid .card-wrap { width:100% !important; }
+        @media (max-width: 560px) {
+          .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+          .page-sub { margin-bottom: 16px; }
+          .search-input { margin-bottom: 18px; }
+        }
       `}</style>
     </div>
   );

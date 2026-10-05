@@ -90,11 +90,13 @@ export const mangadex = {
     };
   },
   chapters: async (mangaId: string): Promise<MangaChapter[]> => {
+    // Pull a wider feed (EN + other langs). Official hosts like MangaPlus set
+    // externalUrl and pages=0 — those cannot be read via at-home.
     const qs = new URLSearchParams({
-      limit: '40',
+      limit: '100',
       'order[chapter]': 'desc',
+      includeEmptyPages: '0',
     });
-    qs.append('translatedLanguage[]', 'en');
     qs.append('includes[]', 'scanlation_group');
     const data = await queuedFetch<{
       data: {
@@ -105,30 +107,56 @@ export const mangadex = {
           volume?: string;
           pages?: number;
           translatedLanguage?: string;
+          externalUrl?: string | null;
         };
         relationships?: { type: string; attributes?: { name?: string } }[];
       }[];
     }>(mangadexQueue, `${BASE}/manga/${mangaId}/feed?${qs}`);
 
-    return (data.data ?? []).map((c) => ({
-      id: c.id,
-      title: c.attributes.title || `Chapter ${c.attributes.chapter ?? '?'}`,
-      chapter: c.attributes.chapter,
-      volume: c.attributes.volume,
-      pages: c.attributes.pages,
-      translatedLanguage: c.attributes.translatedLanguage,
-      groupName: c.relationships?.find((r) => r.type === 'scanlation_group')?.attributes?.name,
-    }));
+    const mapped = (data.data ?? []).map((c) => {
+      const externalUrl = c.attributes.externalUrl || undefined;
+      const pages = c.attributes.pages ?? 0;
+      const readable = !externalUrl && pages > 0;
+      return {
+        id: c.id,
+        title: c.attributes.title || `Chapter ${c.attributes.chapter ?? '?'}`,
+        chapter: c.attributes.chapter,
+        volume: c.attributes.volume,
+        pages,
+        translatedLanguage: c.attributes.translatedLanguage,
+        groupName: c.relationships?.find((r) => r.type === 'scanlation_group')?.attributes?.name,
+        externalUrl,
+        readable,
+      } satisfies MangaChapter;
+    });
+
+    // Readable English first, then other readable, then external (still listed for deep-links)
+    const langRank = (lang?: string) => (lang === 'en' ? 0 : 1);
+    return mapped.sort((a, b) => {
+      if (Boolean(a.readable) !== Boolean(b.readable)) return a.readable ? -1 : 1;
+      const lr = langRank(a.translatedLanguage) - langRank(b.translatedLanguage);
+      if (lr) return lr;
+      return Number(b.chapter || 0) - Number(a.chapter || 0);
+    });
   },
   chapterPages: async (chapterId: string): Promise<string[]> => {
     const data = await queuedFetch<{
       baseUrl: string;
       chapter: { hash: string; data: string[]; dataSaver: string[] };
+      result?: string;
+      errors?: { detail?: string }[];
     }>(mangadexQueue, `${BASE}/at-home/server/${chapterId}`);
     const { baseUrl, chapter } = data;
-    const useSaver = Boolean(chapter.dataSaver?.length);
-    const files = useSaver ? chapter.dataSaver : chapter.data;
-    const quality = useSaver ? 'data-saver' : 'data';
-    return files.map((file) => `${baseUrl}/${quality}/${chapter.hash}/${file}`);
+    if (!chapter) {
+      throw new Error(
+        'This chapter has no readable pages on MangaDex (often an official external release).',
+      );
+    }
+    const list = chapter.data?.length ? chapter.data : chapter.dataSaver || [];
+    if (!list.length) {
+      throw new Error('No page images available for this chapter on MangaDex.');
+    }
+    const quality = chapter.data?.length ? 'data' : 'data-saver';
+    return list.map((file) => `${baseUrl}/${quality}/${chapter.hash}/${file}`);
   },
 };
