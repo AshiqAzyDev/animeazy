@@ -36,14 +36,24 @@ GitHub Pages cannot host the streaming API. Point `VITE_STREAMING_API_BASE` at y
 npm run build
 ```
 
-GitHub Actions workflow in `.github/workflows/deploy.yml` publishes `dist` to GitHub Pages. Add secrets:
+Site: **https://ashiqazydev.github.io/animeazy/**
 
-- `VITE_AUTH0_DOMAIN`
-- `VITE_AUTH0_CLIENT_ID`
-- `VITE_AUTH0_CALLBACK_URL` (e.g. `https://<user>.github.io/<repo>/`)
-- `VITE_AUTH0_AUDIENCE` (optional)
+GitHub Actions (`.github/workflows/deploy.yml`) builds and publishes `dist` to Pages. Source must be **GitHub Actions**.
 
-Enable GitHub Pages with **GitHub Actions** as the source.
+Optional secrets (Settings → Secrets and variables → Actions):
+
+| Secret | Notes |
+|--------|--------|
+| `VITE_AUTH0_DOMAIN` | Auth0 tenant |
+| `VITE_AUTH0_CLIENT_ID` | Auth0 SPA client |
+| `VITE_AUTH0_AUDIENCE` | Optional |
+| `VITE_AUTH0_CALLBACK_URL` | Defaults to `https://ashiqazydev.github.io/animeazy/` |
+| `VITE_OPENSUBTITLES_API_KEY` | Subtitles page |
+| `VITE_STREAMING_API_BASE` | Authorized backend (leave empty for demo) |
+| `VITE_STREAM_MOCK_ENABLED` | Defaults to `true` on Pages |
+| `VITE_STREAM_AUTO_FALLBACK` | Defaults to `false` |
+
+In Auth0, add Allowed Callback / Logout URLs: `https://ashiqazydev.github.io/animeazy/`
 
 ## MangaDex
 
